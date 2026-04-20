@@ -1,24 +1,27 @@
-import pytesseract
-from PIL import Image
+import easyocr
 import numpy as np
 import cv2
-import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"/usr/bin/tesseract"
 
-# import your existing model
+# reuse your SMS model
 from utils.sms_utils import predict_sms
 
+# ---------------------------------
+# LOAD OCR MODEL (CACHE)
+# ---------------------------------
+reader = easyocr.Reader(['en'], gpu=False)
 
-# 🔹 STEP 1: OCR TEXT EXTRACTION
+
+# ---------------------------------
+# STEP 1: OCR TEXT EXTRACTION
+# ---------------------------------
 def extract_text_from_image(image):
     try:
-        # Convert PIL → OpenCV
         img = np.array(image)
 
         # Convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # 🔥 Improve OCR accuracy
+        # Improve clarity
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
         thresh = cv2.adaptiveThreshold(
@@ -30,13 +33,19 @@ def extract_text_from_image(image):
             2
         )
 
+        # EasyOCR expects RGB
+        thresh_rgb = cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
+
         # Extract text
-        text = pytesseract.image_to_string(thresh)
+        result = reader.readtext(thresh_rgb, detail=0)
+
+        text = " ".join(result)
 
         return text
 
     except Exception as e:
         return ""
+
 
 
 # 🔹 STEP 2: CLEAN OCR TEXT (VERY IMPORTANT)
