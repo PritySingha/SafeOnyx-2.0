@@ -1,121 +1,162 @@
-import easyocr
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 import numpy as np
 import cv2
-
-# reuse your SMS model
 from utils.sms_utils import predict_sms
 
-# ---------------------------------
-# LOAD OCR MODEL (CACHE)
-# ---------------------------------
-reader = easyocr.Reader(['en'], gpu=False)
+# ---------------------------------------------------
+# Lazy-load EasyOCR — avoids crash on Render cold start
+# ---------------------------------------------------
+_reader = None
+
+def get_reader():
+    global _reader
+    if _reader is None:
+        import easyocr
+        _reader = easyocr.Reader(['en'], gpu=False)
+    return _reader
 
 
-# ---------------------------------
-# STEP 1: OCR TEXT EXTRACTION
-# ---------------------------------
+def preprocess_for_ocr(image):
+    """
+    Adaptive preprocessing based on image brightness.
+
+    Light backgrounds (SMS bubbles, screenshots) → Otsu threshold
+    Dark / mixed backgrounds                     → CLAHE + Otsu
+    Very noisy images                            → raw upscale only
+
+    Returns an RGB numpy array ready for EasyOCR.
+    """
+    img     = np.array(image.convert("RGB"))
+    img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    gray    = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+
+    # --- Always upscale small images for better OCR ---
+    h, w = gray.shape
+    if w < 1000:
+        scale = 1000 / w
+        gray  = cv2.resize(gray, None, fx=scale, fy=scale,
+                           interpolation=cv2.INTER_CUBIC)
+
+    mean_brightness = gray.mean()
+
+    if mean_brightness > 180:
+        # Light background (e.g. SMS bubble, white email)
+        # Simple Otsu — clean separation of dark text from light bg
+        blur            = cv2.GaussianBlur(gray, (3, 3), 0)
+        _, processed    = cv2.threshold(blur, 0, 255,
+                                        cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    elif mean_brightness > 80:
+        # Mixed / medium contrast (e.g. chat apps with coloured bubbles)
+        # CLAHE normalises local contrast, then Otsu binarises
+        clahe           = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced        = clahe.apply(gray)
+        blur            = cv2.GaussianBlur(enhanced, (3, 3), 0)
+        _, processed    = cv2.threshold(blur, 0, 255,
+                                        cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    else:
+        # Dark background — invert so text is dark-on-light, then Otsu
+        inverted        = cv2.bitwise_not(gray)
+        blur            = cv2.GaussianBlur(inverted, (3, 3), 0)
+        _, processed    = cv2.threshold(blur, 0, 255,
+                                        cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    return cv2.cvtColor(processed, cv2.COLOR_GRAY2RGB)
+
+
 def extract_text_from_image(image):
+    """PIL Image → raw OCR string. Returns '' on failure."""
     try:
-        img = np.array(image)
-
-        # Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        # Improve clarity
-        blur = cv2.GaussianBlur(gray, (5, 5), 0)
-
-        thresh = cv2.adaptiveThreshold(
-            blur,
-            255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            11,
-            2
-        )
-
-        # EasyOCR expects RGB
-        thresh_rgb = cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)
-
-        # Extract text
-        result = reader.readtext(thresh_rgb, detail=0)
-
-        text = " ".join(result)
-
-        return text
-
-    except Exception as e:
+        processed = preprocess_for_ocr(image)
+        result    = get_reader().readtext(processed, detail=0, paragraph=True)
+        return " ".join(result).strip()
+    except Exception:
         return ""
 
 
-
-# 🔹 STEP 2: CLEAN OCR TEXT (VERY IMPORTANT)
 def clean_ocr_text(text):
     text = text.lower()
-
-    # Remove newlines
-    text = text.replace("\n", " ")
-    text = text.replace("\r", " ")
-
-    # Fix common OCR mistakes
-    text = text.replace("0", "o")
-    text = text.replace("1", "l")
+    text = text.replace("\n", " ").replace("\r", " ")
     text = text.replace("₹", " rupees ")
     text = text.replace("$", " dollar ")
-
-    # Remove extra spaces
-    text = " ".join(text.split())
-
-    return text
+    return " ".join(text.split())
 
 
-# 🔹 STEP 3: EXTRA BOOST (FOR OCR CONTEXT)
 def extra_boost_with_reasons(text):
-    text = text.lower()
-    boost = 0
+    """
+    Screenshot-specific rule signals on top of the SMS model.
+    Covers phishing patterns the SMS model may under-weight.
+    """
+    rules = [
+        # (regex_pattern, boost, reason)
+        (r'\blogin\b',                          0.12, "Contains 'login' — phishing trigger"),
+        (r'\bverify\b',                         0.10, "Requests verification"),
+        (r'\baccount\b',                        0.06, "Account-related message"),
+        (r'\blogged out\b|\blocked\b',          0.12, "Account lock threat"),
+        (r'\b24 hours?\b|\b\d+ hours?\b',       0.10, "Time-pressure urgency"),
+        (r'bit\.ly|tinyurl|goo\.gl|t\.co',      0.20, "URL shortener — destination hidden"),
+        (r'https?://|www\.',                    0.08, "Contains a link"),
+        (r'\burgent\b|\bimmediately\b',         0.10, "Urgency language"),
+        (r'\botp\b|\bpassword\b|\bpin\b',       0.12, "Credential request"),
+        (r'\bbank\b',                           0.08, "Bank-related message"),
+        (r'\bwin\b|\bprize\b|\blottery\b',      0.15, "Prize / lottery scam"),
+        (r'\bfree\b',                           0.06, "Free offer"),
+        (r'rupees|dollar|₹|\$',                 0.06, "Money mentioned"),
+        (r'\bsuspended\b|\bsuspend\b',          0.12, "Account suspension threat"),
+        (r'\bclick\b.*\blink\b|\blink\b.*\bclick\b', 0.10, "Click-link call to action"),
+    ]
+
+    import re
+    boost   = 0.0
     reasons = []
 
-    if "otp" in text:
-        boost += 0.10
-        reasons.append("Mentions OTP (sensitive information)")
+    for pattern, value, reason in rules:
+        if re.search(pattern, text):
+            boost += value
+            reasons.append(reason)
 
-    if "bank" in text:
-        boost += 0.10
-        reasons.append("References bank/account")
-
-    if "account" in text:
-        boost += 0.05
-        reasons.append("Mentions account details")
-
-    return boost, reasons
+    # Hard cap — rules alone should not dominate over the ML score
+    return min(boost, 0.50), reasons
 
 
-# 🔹 STEP 4: FINAL PREDICTION FUNCTION
 def predict_screenshot(image):
-    # Extract text
-    raw_text = extract_text_from_image(image)
+    """
+    Returns (label, score_percent, extracted_text, reasons)
 
-    # Clean text
+    label        : 'Scam' | 'Suspicious' | 'Genuine' | 'Unable to Detect'
+    score_percent: 0-100  (risk %)
+    """
+    raw_text     = extract_text_from_image(image)
     cleaned_text = clean_ocr_text(raw_text)
 
-    # ⚠️ If OCR fails
     if len(cleaned_text.strip()) < 10:
-        return raw_text, "Unable to Detect", 0
+        return "Unable to Detect", 0, raw_text or "", \
+               ["No readable text found — try a clearer screenshot"]
 
-    # Get prediction from SMS model
-    label, score, reasons = predict_sms(cleaned_text)
-    score = score / 100
+    # predict_sms returns (label, pct_score 0-100, reasons)
+    _label, pct_score, sms_reasons = predict_sms(cleaned_text)
 
-    # Apply extra boost
-    extra, extra_reasons = extra_boost_with_reasons(cleaned_text)
+    # Normalise to 0-1 for internal maths
+    ml_01 = pct_score / 100.0
 
-    final_score = min(score + extra , 1.0)
+    extra_boost, extra_reasons = extra_boost_with_reasons(cleaned_text)
 
-    all_reasons = reasons + extra_reasons
+    # ML is primary signal; extra rules add evidence
+    final_01 = min(ml_01 * 0.65 + extra_boost * 0.35 + extra_boost, 1.0)
+    # Simplified honest blend:
+    final_01  = min(ml_01 + extra_boost, 1.0)
 
-    # Recalculate label if needed
-    if final_score >= 0.4:
+    # Three-tier labels
+    if final_01 >= 0.60:
         final_label = "Scam"
+    elif final_01 >= 0.40:
+        final_label = "Suspicious"
     else:
         final_label = "Genuine"
 
-    return cleaned_text, final_label, round(final_score * 100, 2), all_reasons
+    all_reasons = sms_reasons + extra_reasons
+
+    return final_label, round(final_01 * 100, 2), cleaned_text, all_reasons

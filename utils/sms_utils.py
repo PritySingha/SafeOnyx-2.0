@@ -1,8 +1,23 @@
 import pickle
 import re
-from nltk.corpus import stopwords
+import os
 
-stop_words = set(stopwords.words('english'))
+# -------------------------------------------
+# NLTK stopwords — safe download for Render
+# -------------------------------------------
+import nltk
+nltk_data_dir = os.path.join(os.path.dirname(__file__), "..", "nltk_data")
+os.makedirs(nltk_data_dir, exist_ok=True)
+nltk.data.path.append(os.path.abspath(nltk_data_dir))
+
+try:
+    from nltk.corpus import stopwords
+    stop_words = set(stopwords.words('english'))
+except LookupError:
+    nltk.download('stopwords', download_dir=os.path.abspath(nltk_data_dir))
+    from nltk.corpus import stopwords
+    stop_words = set(stopwords.words('english'))
+
 
 # Load model
 with open("models/sms_model.pkl", "rb") as f:
@@ -12,89 +27,104 @@ with open("models/sms_vectorizer.pkl", "rb") as f:
     vectorizer = pickle.load(f)
 
 
-# 🔹 Clean text
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r'[^a-zA-Z₹$]', ' ', text)
+    # Keep currency symbols as words before stripping
+    text = text.replace("₹", " rupees ").replace("$", " dollar ")
+    text = re.sub(r'[^a-zA-Z\s]', ' ', text)
     words = text.split()
-    words = [w for w in words if w not in stop_words]
+    words = [w for w in words if w not in stop_words and len(w) > 1]
     return " ".join(words)
 
 
-# 🔹 ML score (0–1)
 def get_ml_score(text):
-    cleaned = clean_text(text)
+    """Returns probability of spam/scam (0.0 – 1.0)."""
+    cleaned    = clean_text(text)
     vectorized = vectorizer.transform([cleaned])
-    prob = model.predict_proba(vectorized)[0][1]
-    return prob
+    prob       = model.predict_proba(vectorized)[0][1]
+    return float(prob)
 
 
 def rule_boost(text):
-    text = text.lower()
-    boost = 0
+    """
+    Rule-based additive boost.
+    Each rule is calibrated to avoid over-flagging legitimate messages.
+    Returns (boost 0-1, reasons list).
+    """
+    t       = text.lower()
+    boost   = 0.0
     reasons = []
 
-    # 🔴 Prize scams
-    if "win" in text or "won" in text:
+    # — Prize / winning scams
+    if re.search(r'\b(win|won|winner|prize|lucky draw)\b', t):
         boost += 0.15
-        reasons.append("Winning/prize-related message")
+        reasons.append("Prize or winning language detected")
 
-    # 🔴 Urgency
-    if "urgent" in text:
+    # — Urgency
+    if re.search(r'\b(urgent|immediately|expire|last chance|act now)\b', t):
         boost += 0.10
-        reasons.append("Uses urgency word")
+        reasons.append("Urgency language detected")
 
-    # 🔴 Action triggers
-    if "click" in text:
-        boost += 0.10
-        reasons.append("Asks to click a link")
+    # — Action trigger
+    if re.search(r'\b(click|tap|open|visit)\b', t) and \
+       re.search(r'(http|www|link|\.com|\.in)', t):
+        boost += 0.12
+        reasons.append("Suspicious link with call-to-action")
 
-    if "verify" in text:
-        boost += 0.10
-        reasons.append("Requests verification")
+    # — Verification / credential phishing
+    if re.search(r'\b(verify|otp|password|pin|credentials)\b', t):
+        boost += 0.12
+        reasons.append("Credential or OTP-related request")
 
-    # 🔴 Links
-    if "http" in text or "www" in text:
-        boost += 0.15
-        reasons.append("Contains a link")
+    # — Money / financial bait
+    if re.search(r'(₹|\$|rupees|dollar|rs\.?\s*\d+|\d+\s*rs)', t):
+        boost += 0.08
+        reasons.append("Mentions money or financial reward")
 
-    # 🔴 Money bait
-    if "₹" in text or "$" in text:
-        boost += 0.10
-        reasons.append("Mentions money")
+    # — Links
+    if re.search(r'https?://|www\.', t):
+        boost += 0.08
+        reasons.append("Contains a URL")
 
-    # 🔥 NEW: JOB SCAM DETECTION
+    # — Job scam cluster (needs multiple signals)
     job_keywords = [
         "earn", "daily", "income", "work from home",
         "job offer", "part time", "limited slots",
-        "no experience", "start earning"
+        "no experience", "start earning", "per day",
+        "weekly pay", "guaranteed income"
     ]
-
-    matches = sum(1 for word in job_keywords if word in text)
-
+    matches = sum(1 for kw in job_keywords if kw in t)
     if matches >= 3:
-        boost += 0.45
-        reasons.append("Strong job scam pattern detected")
+        boost += 0.40
+        reasons.append("Strong job-scam pattern detected")
     elif matches == 2:
-        boost += 0.30
+        boost += 0.20
         reasons.append("Possible job scam indicators")
 
-    return boost, reasons
+    # Hard cap so rules alone can't reach 1.0
+    return min(boost, 0.50), reasons
 
-# 🔹 FINAL FUNCTION (MAIN FIX HERE)
-def predict_sms(text, threshold=0.4):
-    ml_score = get_ml_score(text)        # 0–1
-    boost, reasons = rule_boost(text)    # 0–1
 
+def predict_sms(text, threshold=0.50):
+    """
+    Returns (label, score_percent, reasons).
+    label        : 'Scam' | 'Suspicious' | 'Genuine'
+    score_percent: 0-100  (risk % for Scam/Suspicious, safety % for Genuine)
+    reasons      : list of human-readable explanations
+    """
+    ml_score          = get_ml_score(text)          # 0–1
+    boost, reasons    = rule_boost(text)            # 0–1
+
+    # Weighted combination: ML is primary signal
+    final_score = min(ml_score * 0.70 + boost * 0.30 + boost, 1.0)
+    # Simpler & more honest: just add boost as evidence on top of ML
     final_score = min(ml_score + boost, 1.0)
 
-    # Label decision
     if final_score >= threshold:
         label = "Scam"
+    elif final_score >= 0.35:
+        label = "Suspicious"
     else:
         label = "Genuine"
 
-    # Convert to percentage ONLY here
-    percentage_score = round(final_score * 100, 2)
-
-    return label, percentage_score, reasons
+    return label, round(final_score * 100, 2), reasons

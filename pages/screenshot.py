@@ -7,7 +7,7 @@ from utils.screenshot_utils import predict_screenshot
 # ---------------------------------
 # PAGE CONFIG
 # ---------------------------------
-st.set_page_config(page_title="Screenshot Detection", layout="wide")
+st.set_page_config(page_title="Screenshot Detection", page_icon="assets/logo.png", layout="wide")
 
 # ---------------------------------
 # LOAD CSS
@@ -78,11 +78,6 @@ if uploaded_file is not None:
                 f"<div class='result-box result-safe'>✅ Genuine ({score}% safe)</div>",
                 unsafe_allow_html=True
             )
-
-        # ---------------------------------
-        # PROGRESS BAR
-        # ---------------------------------
-        st.progress(min(score / 100, 1.0))
 
         # ---------------------------------
         # EXTRACTED TEXT

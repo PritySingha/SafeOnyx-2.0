@@ -1,219 +1,164 @@
 import pickle
-import pandas as pd
 import re
+import pandas as pd
 import tldextract
 
-# Load model
 with open("models/url_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 with open("models/url_columns.pkl", "rb") as f:
     columns = pickle.load(f)
 
+# Suspicious TLDs
+SUSPICIOUS_TLDS = {".ru", ".tk", ".ml", ".xyz", ".top", ".gq", ".cf", ".pw", ".cc"}
 
-# 🔹 Helper: check IP address
+# Known-safe domains (skip heavy rule boosting for these)
+KNOWN_SAFE_DOMAINS = {
+    "google", "youtube", "facebook", "twitter", "instagram",
+    "linkedin", "microsoft", "apple", "amazon", "wikipedia",
+    "github", "stackoverflow", "reddit", "netflix", "spotify"
+}
+
+
 def has_ip(url):
-    return 1 if re.search(r'\d+\.\d+\.\d+\.\d+', url) else -1
+    return 1 if re.search(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', url) else -1
 
 
-# 🔹 Feature extraction
 def extract_features(url):
+    extracted = tldextract.extract(url)
+    domain    = extracted.domain
+    subdomain = extracted.subdomain
+    suffix    = "." + extracted.suffix if extracted.suffix else ""
+
     features = {}
 
-    extracted = tldextract.extract(url)
-    domain = extracted.domain
-    subdomain = extracted.subdomain
+    features['having_IPhaving_IP_Address']  = has_ip(url)
+    features['URLURL_Length']               = 1 if len(url) < 75 else -1
+    features['Shortining_Service']          = -1 if any(
+        x in url for x in ["bit.ly", "tinyurl", "goo.gl", "t.co", "ow.ly"]
+    ) else 1
+    features['having_At_Symbol']            = -1 if "@" in url else 1
+    features['double_slash_redirecting']    = -1 if url.count("//") > 1 else 1
+    features['Prefix_Suffix']              = -1 if "-" in domain else 1
+    features['having_Sub_Domain']          = -1 if subdomain.count('.') >= 1 else 1
+    features['SSLfinal_State']             = 1 if url.startswith("https") else -1
+    features['HTTPS_token']               = -1 if "https" in domain else 1
 
-    # ✅ BASIC FEATURES
-    features['having_IPhaving_IP_Address'] = has_ip(url)
-    features['URLURL_Length'] = 1 if len(url) < 54 else 0
-    features['Shortining_Service'] = 1 if any(x in url for x in ["bit.ly", "tinyurl", "goo.gl"]) else -1
-    features['having_At_Symbol'] = 1 if "@" in url else -1
-    features['double_slash_redirecting'] = 1 if url.count("//") > 1 else -1
-    features['Prefix_Suffix'] = 1 if "-" in domain else -1
-    features['having_Sub_Domain'] = 1 if subdomain.count('.') > 1 else -1
-
-    # 🔐 HTTPS
-    features['SSLfinal_State'] = 1 if url.startswith("https") else -1
-    features['HTTPS_token'] = 1 if "https" in domain else -1
-
-    # ⚠️ APPROXIMATED FEATURES
-    features['Domain_registeration_length'] = 1
-    features['age_of_domain'] = 1
-    features['DNSRecord'] = 1
-    features['web_traffic'] = 1
-    features['Page_Rank'] = 1
-    features['Google_Index'] = 1
-
-    # ❌ UNAVAILABLE → neutral
-    neutral = 1
-    features['Favicon'] = neutral
-    features['port'] = neutral
-    features['Request_URL'] = neutral
-    features['URL_of_Anchor'] = neutral
-    features['Links_in_tags'] = neutral
-    features['SFH'] = neutral
-    features['Submitting_to_email'] = neutral
-    features['Abnormal_URL'] = neutral
-    features['Redirect'] = neutral
-    features['on_mouseover'] = neutral
-    features['RightClick'] = neutral
-    features['popUpWidnow'] = neutral
-    features['Iframe'] = neutral
-    features['Links_pointing_to_page'] = neutral
-    features['Statistical_report'] = neutral
+    # Approximated / unavailable — set neutral (1)
+    neutral_features = [
+        'Domain_registeration_length', 'age_of_domain', 'DNSRecord',
+        'web_traffic', 'Page_Rank', 'Google_Index', 'Favicon', 'port',
+        'Request_URL', 'URL_of_Anchor', 'Links_in_tags', 'SFH',
+        'Submitting_to_email', 'Abnormal_URL', 'Redirect',
+        'on_mouseover', 'RightClick', 'popUpWidnow', 'Iframe',
+        'Links_pointing_to_page', 'Statistical_report'
+    ]
+    for nf in neutral_features:
+        features[nf] = 1
 
     return features
 
 
-# 🔹 Prepare dataframe
 def prepare_input(url):
     features = extract_features(url)
     df = pd.DataFrame([features])
-
     for col in columns:
-        if col not in df:
+        if col not in df.columns:
             df[col] = 0
-
-    df = df[columns]
-    return df
+    return df[columns]
 
 
-# 🔹 ML score
 def get_ml_score(url):
-    df = prepare_input(url)
-    prob = model.predict_proba(df)[0][1]
-    return prob
+    df   = prepare_input(url)
+    prob = model.predict_proba(df)[0]
+    # index 1 = phishing/scam class
+    return float(prob[1])
 
 
-# 🔥 RULE BOOST (IMPORTANT)
-def rule_boost(url):
-    url = url.lower()
-    boost = 0
+def rule_boost(url, domain):
+    t       = url.lower()
+    boost   = 0.0
     reasons = []
 
-    # 🔴 Suspicious keywords (STRONG SIGNAL)
-    keywords = ["login", "verify", "secure", "update", "account", "bank", "paypal"]
+    # — Suspicious keywords in path/query
+    phishing_kws = ["login", "verify", "secure", "update", "account",
+                    "bank", "paypal", "signin", "confirm", "password"]
+    hits = [kw for kw in phishing_kws if kw in t]
+    if hits:
+        boost += min(len(hits) * 0.07, 0.25)
+        reasons.append(f"Phishing keywords in URL: {', '.join(hits)}")
 
-    for word in keywords:
-        if word in url:
-            boost += 0.08
-            reasons.append(f"Contains '{word}' keyword")
-
-    # 🔴 Free/gift scams
-    if "free" in url or "gift" in url or "win" in url:
+    # — Free / gift / scam bait
+    if re.search(r'\b(free|gift|win|prize|lucky|reward)\b', t):
         boost += 0.20
-        reasons.append("Free/gift scam pattern")
+        reasons.append("Free/gift/prize scam pattern")
 
-    # 🔴 Suspicious TLD
-    if any(tld in url for tld in [".ru", ".tk", ".ml", ".xyz"]):
-        boost += 0.20
-        reasons.append("Suspicious domain extension")
+    # — Suspicious TLD
+    for tld in SUSPICIOUS_TLDS:
+        if t.endswith(tld) or f"{tld}/" in t:
+            boost += 0.20
+            reasons.append(f"Suspicious domain extension ({tld})")
+            break
 
-    # 🔴 Structure issues
-    if url.count("-") > 2:
+    # — Structural issues
+    if url.count("-") > 3:
         boost += 0.10
-        reasons.append("Too many hyphens")
+        reasons.append("Excessive hyphens in URL")
 
-    if url.count(".") > 3:
+    if url.count(".") > 4:
         boost += 0.10
-        reasons.append("Too many subdomains")
+        reasons.append("Excessive subdomains")
 
     if "@" in url:
-        boost += 0.15
-        reasons.append("Contains '@' symbol")
+        boost += 0.20
+        reasons.append("Contains '@' — redirects to different host")
 
-    return boost, reasons
+    if has_ip(url) == 1:
+        boost += 0.20
+        reasons.append("URL uses raw IP address instead of domain")
 
+    # — Shortener
+    if any(x in t for x in ["bit.ly", "tinyurl", "goo.gl", "t.co"]):
+        boost += 0.10
+        reasons.append("URL shortener detected — destination unknown")
 
-# 🔹 Final prediction
-def predict_url(url, threshold=0.4):
-    ml_score = get_ml_score(url)
-    boost, reasons = rule_boost(url)
-
-    # ✅ CASE 1: No suspicious signals → TRUST URL
-    if boost == 0:
-        return "Genuine", 90.0, ["No suspicious patterns detected"]
-
-    # ✅ CASE 2: Suspicious → use ML + rules
-    final_score = (0.3 * ml_score) + (0.7 * boost)
-
-    # Safe bonus (light)
-    if url.startswith("https"):
-        final_score -= 0.05
-
-    final_score = max(0, min(final_score, 1))
-
-    if final_score >= threshold:
-        label = "Scam"
-    else:
-        label = "Genuine"
-
-    return label, round(final_score * 100, 2), reasons
-    ml_score = get_ml_score(url)       # 0–1
-    boost, reasons = rule_boost(url)   # 0–1
-
-    print("URL:", url)
-    print("ML SCORE:", ml_score)
-    print("BOOST:", boost)
-    # 🔥 Balanced scoring (ML slightly stronger)
-    final_score = (0.6 * ml_score) + (0.4 * boost)
-
-    # 🔥 APPLY SAFE BONUS ONLY FOR CLEAN URLs
-    safe_bonus = 0
-
-    if (
-        url.startswith("https") and
-        url.count("-") == 0 and
-        url.count(".") <= 2 and
-        "@" not in url
-    ):
-        safe_bonus = 0.10
-
-    final_score = max(0, final_score - safe_bonus)
-
-    # 🔥 FINAL DECISION
-    if final_score >= threshold:
-        label = "Scam"
-    else:
-        label = "Genuine"
-
-    return label, round(final_score * 100, 2), reasons
-
-    
+    return min(boost, 0.60), reasons
 
 
+def predict_url(url, threshold=0.45):
+    """
+    Returns (label, score_percent, reasons).
+    label        : 'Scam' | 'Suspicious' | 'Genuine'
+    score_percent: 0-100
+    """
+    if not url.startswith(("http://", "https://")):
+        url = "http://" + url
 
+    extracted = tldextract.extract(url)
+    domain    = extracted.domain.lower()
 
+    # Fast-pass for well-known safe domains
+    if domain in KNOWN_SAFE_DOMAINS:
+        return "Genuine", 5.0, ["Recognised safe domain"]
 
+    ml_score       = get_ml_score(url)
+    boost, reasons = rule_boost(url, domain)
 
+    # ML is primary; rules add evidence
+    final_score = min(ml_score * 0.60 + boost * 0.40, 1.0)
 
-
-
-
-    ml_score = get_ml_score(url)
-    boost, reasons = rule_boost(url)
-
-    # Balanced scoring
-    final_score = (0.5 * ml_score) + (0.5 * boost)
-
-    # ✅ Safe bonus
-    safe_bonus = 0
-
-    if url.startswith("https"):
-        safe_bonus += 0.05
-
-    if url.count("-") == 0:
-        safe_bonus += 0.05
-
-    if url.count(".") <= 2:
-        safe_bonus += 0.05
-
-    final_score = max(0, final_score - safe_bonus)
+    # HTTPS gives a small safety discount
+    if url.startswith("https://") and boost < 0.20:
+        final_score = max(final_score - 0.05, 0.0)
 
     if final_score >= threshold:
         label = "Scam"
+    elif final_score >= 0.28:
+        label = "Suspicious"
     else:
         label = "Genuine"
+
+    if not reasons:
+        reasons = ["No suspicious patterns detected"]
 
     return label, round(final_score * 100, 2), reasons

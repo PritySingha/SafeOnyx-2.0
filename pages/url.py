@@ -6,7 +6,7 @@ from utils.url_utils import predict_url
 # ---------------------------------
 # PAGE CONFIG
 # ---------------------------------
-st.set_page_config(page_title="URL Detection", layout="wide")
+st.set_page_config(page_title="URL Detection", page_icon="assets/logo.png",layout="wide")
 
 # ---------------------------------
 # LOAD CSS

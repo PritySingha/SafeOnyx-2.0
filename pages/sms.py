@@ -6,7 +6,7 @@ from utils.sms_utils import predict_sms
 # ---------------------------------
 # PAGE CONFIG
 # ---------------------------------
-st.set_page_config(page_title="SMS Detection", layout="wide")
+st.set_page_config(page_title="SMS Detection",page_icon="assets/logo.png", layout="wide")
 
 # ---------------------------------
 # LOAD CSS
