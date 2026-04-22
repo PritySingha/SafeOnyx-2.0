@@ -7,7 +7,7 @@
 ## 🚀 Overview
 
 SafeOnyx is a **full-stack AI application** designed to detect real-world scams in multiple formats.
-It combines **NLP models, feature-engineered classifiers, and OCR pipelines** into a unified interface for real-time fraud detection.
+It combines **feature-engineered classifiers and OCR pipelines** into a unified interface for real-time fraud detection.
 
 This project simulates a **practical cybersecurity product**, not just a model — focusing on **accuracy, explainability, and usability**.
 
