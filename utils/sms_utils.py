@@ -1,11 +1,8 @@
 import pickle
 import re
 import os
+import nltk     # NLTK stopwords
 
-# -------------------------------------------
-# NLTK stopwords — safe download for Render
-# -------------------------------------------
-import nltk
 nltk_data_dir = os.path.join(os.path.dirname(__file__), "..", "nltk_data")
 os.makedirs(nltk_data_dir, exist_ok=True)
 nltk.data.path.append(os.path.abspath(nltk_data_dir))
@@ -17,7 +14,6 @@ except LookupError:
     nltk.download('stopwords', download_dir=os.path.abspath(nltk_data_dir))
     from nltk.corpus import stopwords
     stop_words = set(stopwords.words('english'))
-
 
 # Load model
 with open("models/sms_model.pkl", "rb") as f:
@@ -38,7 +34,6 @@ def clean_text(text):
 
 
 def get_ml_score(text):
-    """Returns probability of spam/scam (0.0 – 1.0)."""
     cleaned    = clean_text(text)
     vectorized = vectorizer.transform([cleaned])
     prob       = model.predict_proba(vectorized)[0][1]
@@ -46,11 +41,6 @@ def get_ml_score(text):
 
 
 def rule_boost(text):
-    """
-    Rule-based additive boost.
-    Each rule is calibrated to avoid over-flagging legitimate messages.
-    Returns (boost 0-1, reasons list).
-    """
     t       = text.lower()
     boost   = 0.0
     reasons = []
@@ -105,24 +95,15 @@ def rule_boost(text):
     return min(boost, 0.50), reasons
 
 
-def predict_sms(text, threshold=0.50):
-    """
-    Returns (label, score_percent, reasons).
-    label        : 'Scam' | 'Suspicious' | 'Genuine'
-    score_percent: 0-100  (risk % for Scam/Suspicious, safety % for Genuine)
-    reasons      : list of human-readable explanations
-    """
-    ml_score          = get_ml_score(text)          # 0–1
-    boost, reasons    = rule_boost(text)            # 0–1
+def predict_sms(text, threshold=0.45):
+    ml_score          = get_ml_score(text)          
+    boost, reasons    = rule_boost(text)            
 
-    # Weighted combination: ML is primary signal
     final_score = min(ml_score * 0.70 + boost * 0.30 + boost, 1.0)
-    # Simpler & more honest: just add boost as evidence on top of ML
-    final_score = min(ml_score + boost, 1.0)
 
     if final_score >= threshold:
         label = "Scam"
-    elif final_score >= 0.35:
+    elif final_score >= 0.30:
         label = "Suspicious"
     else:
         label = "Genuine"

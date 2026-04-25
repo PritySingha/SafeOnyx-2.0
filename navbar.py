@@ -15,7 +15,6 @@ def show_navbar(active_page="Home"):
     logo_path = Path("assets/logo.png")
     logo_base64 = get_base64_of_image(logo_path)
 
-    # Hide Streamlit default header
     st.markdown("""
     <style>
     header[data-testid="stHeader"] { display: none !important; }

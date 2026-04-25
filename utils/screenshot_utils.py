@@ -5,9 +5,6 @@ import numpy as np
 import cv2
 from utils.sms_utils import predict_sms
 
-# ---------------------------------------------------
-# Lazy-load EasyOCR — avoids crash on Render cold start
-# ---------------------------------------------------
 _reader = None
 
 def get_reader():
@@ -19,20 +16,11 @@ def get_reader():
 
 
 def preprocess_for_ocr(image):
-    """
-    Adaptive preprocessing based on image brightness.
-
-    Light backgrounds (SMS bubbles, screenshots) → Otsu threshold
-    Dark / mixed backgrounds                     → CLAHE + Otsu
-    Very noisy images                            → raw upscale only
-
-    Returns an RGB numpy array ready for EasyOCR.
-    """
     img     = np.array(image.convert("RGB"))
     img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     gray    = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
 
-    # --- Always upscale small images for better OCR ---
+    # --- upscale small images for better OCR ---
     h, w = gray.shape
     if w < 1000:
         scale = 1000 / w
@@ -123,12 +111,6 @@ def extra_boost_with_reasons(text):
 
 
 def predict_screenshot(image):
-    """
-    Returns (label, score_percent, extracted_text, reasons)
-
-    label        : 'Scam' | 'Suspicious' | 'Genuine' | 'Unable to Detect'
-    score_percent: 0-100  (risk %)
-    """
     raw_text     = extract_text_from_image(image)
     cleaned_text = clean_ocr_text(raw_text)
 
@@ -136,7 +118,7 @@ def predict_screenshot(image):
         return "Unable to Detect", 0, raw_text or "", \
                ["No readable text found — try a clearer screenshot"]
 
-    # predict_sms returns (label, pct_score 0-100, reasons)
+ 
     _label, pct_score, sms_reasons = predict_sms(cleaned_text)
 
     # Normalise to 0-1 for internal maths
@@ -144,10 +126,8 @@ def predict_screenshot(image):
 
     extra_boost, extra_reasons = extra_boost_with_reasons(cleaned_text)
 
-    # ML is primary signal; extra rules add evidence
     final_01 = min(ml_01 * 0.65 + extra_boost * 0.35 + extra_boost, 1.0)
-    # Simplified honest blend:
-    final_01  = min(ml_01 + extra_boost, 1.0)
+
 
     # Three-tier labels
     if final_01 >= 0.60:

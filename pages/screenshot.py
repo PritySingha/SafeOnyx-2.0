@@ -4,25 +4,13 @@ from navbar import show_navbar
 from footer import show_footer
 from utils.screenshot_utils import predict_screenshot
 
-# ---------------------------------
-# PAGE CONFIG
-# ---------------------------------
 st.set_page_config(page_title="Screenshot Detection", page_icon="assets/logo.png", layout="wide")
 
-# ---------------------------------
-# LOAD CSS
-# ---------------------------------
 with open("assets/style.css", encoding="utf-8") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# ---------------------------------
-# NAVBAR
-# ---------------------------------
 show_navbar("Screenshot")
 
-# ---------------------------------
-# PAGE HEADER
-# ---------------------------------
 st.markdown("""
 <div class="section-label">Screenshot Analysis</div>
 
@@ -36,17 +24,11 @@ AI will extract text and detect scam patterns instantly.
 </p>
 """, unsafe_allow_html=True)
 
-# ---------------------------------
-# FILE UPLOAD
-# ---------------------------------
 uploaded_file = st.file_uploader(
     "Upload Screenshot",
     type=["png", "jpg", "jpeg"]
 )
 
-# ---------------------------------
-# PROCESS IMAGE
-# ---------------------------------
 if uploaded_file is not None:
 
     image = Image.open(uploaded_file)
@@ -58,9 +40,6 @@ if uploaded_file is not None:
         with st.spinner("Extracting text and analyzing..."):
             label, score, extracted_text, reasons = predict_screenshot(image)
 
-        # ---------------------------------
-        # RESULT DISPLAY
-        # ---------------------------------
         if label == "Scam":
             st.markdown(
                 f"<div class='result-box result-scam'>⚠️ Scam Detected ({score}% risk)</div>",
@@ -79,23 +58,15 @@ if uploaded_file is not None:
                 unsafe_allow_html=True
             )
 
-        # ---------------------------------
-        # EXTRACTED TEXT
-        # ---------------------------------
         st.markdown("### 📝 Extracted Text")
         st.text_area("", extracted_text, height=150)
 
-        # ---------------------------------
-        # REASONS
-        # ---------------------------------
         if reasons:
             st.markdown("### 🔍 Why this result?")
             for r in reasons:
                 st.write(f"- {r}")
 
-# ---------------------------------
-# SAMPLE TEST INFO
-# ---------------------------------
+
 st.markdown("""
 ### 🧪 Tips for testing
 - Upload WhatsApp scam messages
@@ -103,8 +74,5 @@ st.markdown("""
 - Try job scam or lottery screenshots
 """)
 
-# ---------------------------------
-# FOOTER
-# ---------------------------------
 show_footer()
 

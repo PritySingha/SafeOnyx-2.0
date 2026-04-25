@@ -33,7 +33,6 @@ def clean_text(text):
 
 
 def get_ml_score(text):
-    """Single combined text string → probability 0-1."""
     cleaned    = clean_text(text)
     vectorized = vectorizer.transform([cleaned])
     return float(model.predict_proba(vectorized)[0][1])
@@ -101,12 +100,6 @@ def rule_boost(text):
 
 
 def predict_email(text, threshold=0.45):
-    """
-    Accepts a SINGLE combined text string (subject + body merged by the page).
-    Returns (label, score_percent, reasons).
-    label        : 'Scam' | 'Suspicious' | 'Genuine'
-    score_percent: 0-100
-    """
     ml_score       = get_ml_score(text)
     boost, reasons = rule_boost(text)
 

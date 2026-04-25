@@ -54,12 +54,27 @@ def show_footer():
         font-size: 12px;
         color: #363960;
     }}
+
+    .footer-clean {{
+        padding: 36px 0 22px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }}
+
+    .footer-clean p {{
+        font-size: 12px;
+        color: var(--faint);
+    }}
+    
     @media (max-width: 680px) {{
         .safeonyx-footer {{
             flex-direction: column;
             text-align: center;
         }}
     }}
+
     </style>
 
     <div class="safeonyx-footer">

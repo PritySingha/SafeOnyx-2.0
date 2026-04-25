@@ -44,7 +44,7 @@ def extract_features(url):
     features['SSLfinal_State']             = 1 if url.startswith("https") else -1
     features['HTTPS_token']               = -1 if "https" in domain else 1
 
-    # Approximated / unavailable — set neutral (1)
+    # unavailable — set neutral (1)
     neutral_features = [
         'Domain_registeration_length', 'age_of_domain', 'DNSRecord',
         'web_traffic', 'Page_Rank', 'Google_Index', 'Favicon', 'port',
@@ -126,11 +126,6 @@ def rule_boost(url, domain):
 
 
 def predict_url(url, threshold=0.45):
-    """
-    Returns (label, score_percent, reasons).
-    label        : 'Scam' | 'Suspicious' | 'Genuine'
-    score_percent: 0-100
-    """
     if not url.startswith(("http://", "https://")):
         url = "http://" + url
 
@@ -153,7 +148,7 @@ def predict_url(url, threshold=0.45):
 
     if final_score >= threshold:
         label = "Scam"
-    elif final_score >= 0.28:
+    elif final_score >= 0.30:
         label = "Suspicious"
     else:
         label = "Genuine"

@@ -1,9 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 
-/* ============================================================
-   SAFEONIX — styles.css
-   Drop this into assets/styles.css
-   ============================================================ */
 
 :root {
     --bg:       #0c0b14;
@@ -49,79 +45,6 @@ html, body, [class*="css"] {
 
 header[data-testid="stHeader"] {
     background: transparent;
-}
-
-/* ── NAVBAR ────────────────────────────────────────────── */
-
-.topbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 0;
-    margin-bottom: 0;
-    border-bottom: 1px solid var(--line);
-}
-
-.brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-}
-
-.brand-logo {
-    width: 44px;
-    height: 44px;
-    object-fit: contain;
-    filter: drop-shadow(0 0 8px rgba(130,80,200,0.35));
-}
-
-.brand-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1;
-}
-
-.brand-name {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: #e8e0f8;
-}
-
-.brand-tagline {
-    font-size: 9.5px;
-    font-weight: 500;
-    letter-spacing: 0.14em;
-    color: #6b5a9e;
-    text-transform: uppercase;
-    margin-top: 3px;
-}
-
-.nav-links {
-    display: flex;
-    gap: 2px;
-    flex-wrap: wrap;
-}
-
-.nav-links a {
-    text-decoration: none;
-    color: var(--muted);
-    font-size: 13.5px;
-    font-weight: 500;
-    padding: 7px 14px;
-    border-radius: 8px;
-    transition: 0.15s ease;
-}
-
-.nav-links a:hover {
-    color: #e0daf5;
-    background: rgba(130,80,200,0.08);
-}
-
-.nav-links a.active {
-    color: #c4b5f7;
-    background: rgba(130,80,200,0.15);
 }
 
 /* ── HERO ──────────────────────────────────────────────── */
@@ -535,7 +458,7 @@ header[data-testid="stHeader"] {
     font-weight: 500;
 }
 
-/* ── PAGE HEADERS (Dashboard / Predict) ────────────────── */
+/* ── PAGE HEADERS ────────────────── */
 
 .page-header {
     font-size: 30px;
@@ -560,20 +483,6 @@ header[data-testid="stHeader"] {
     border: 1px dashed var(--line);
 }
 
-/* ── FOOTER ────────────────────────────────────────────── */
-
-.footer-clean {
-    padding: 36px 0 22px;
-    border-top: 1px solid var(--line);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.footer-clean p {
-    font-size: 12px;
-    color: var(--faint);
-}
 
 /* ── STREAMLIT OVERRIDES ───────────────────────────────── */
 
@@ -652,14 +561,9 @@ header[data-testid="stHeader"] {
 
 /* Additional fix for sticky navbar */
 .block-container {
-    padding-top: 0 !important;  /* remove Streamlit's default top padding */
+    padding-top: 0 !important;  
 }
 
-/* Ensure the navbar's backdrop blur works on all browsers */
-.safeonix-nav {
-    background: rgba(12, 11, 20, 0.92) !important;
-    backdrop-filter: blur(12px);
-}
 
 /* ========== RESPONSIVE METRICS GRID ========== */
 .metrics-grid {

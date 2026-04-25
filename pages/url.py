@@ -3,25 +3,13 @@ from navbar import show_navbar
 from footer import show_footer
 from utils.url_utils import predict_url
 
-# ---------------------------------
-# PAGE CONFIG
-# ---------------------------------
 st.set_page_config(page_title="URL Detection", page_icon="assets/logo.png",layout="wide")
 
-# ---------------------------------
-# LOAD CSS
-# ---------------------------------
 with open("assets/style.css", encoding="utf-8") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# ---------------------------------
-# NAVBAR
-# ---------------------------------
 show_navbar("URL")
 
-# ---------------------------------
-# PAGE HEADER
-# ---------------------------------
 st.markdown("""
 <div class="section-label">URL Analysis</div>
 
@@ -34,14 +22,8 @@ Enter any URL to detect phishing links, fake domains, or malicious websites.
 </p>
 """, unsafe_allow_html=True)
 
-# ---------------------------------
-# INPUT SECTION
-# ---------------------------------
 url_input = st.text_input("Enter URL (e.g., https://example.com)")
 
-# ---------------------------------
-# ANALYZE BUTTON
-# ---------------------------------
 if st.button("Analyze URL"):
 
     if url_input.strip() == "":
@@ -50,9 +32,6 @@ if st.button("Analyze URL"):
         with st.spinner("Analyzing URL..."):
             label, score, reasons = predict_url(url_input)
 
-        # ---------------------------------
-        # RESULT DISPLAY
-        # ---------------------------------
         if label == "Scam":
             st.markdown(
                 f"<div class='result-box result-scam'>⚠️ Scam Detected ({score}% risk)</div>",
@@ -71,22 +50,14 @@ if st.button("Analyze URL"):
                 unsafe_allow_html=True
             )
 
-        # ---------------------------------
-        # PROGRESS BAR
-        # ---------------------------------
         st.progress(min(score / 100, 1.0))
 
-        # ---------------------------------
-        # REASONS
-        # ---------------------------------
+
         if reasons:
             st.markdown("### 🔍 Why this result?")
             for r in reasons:
                 st.write(f"- {r}")
 
-# ---------------------------------
-# SAMPLE TEST BUTTONS (VERY USEFUL)
-# ---------------------------------
 st.markdown("### 🧪 Try Sample URLs")
 
 col1, col2 = st.columns(2)
@@ -103,7 +74,4 @@ with col2:
         label, score, reasons = predict_url(test_url)
         st.info(f"{test_url} → {label} ({score}%)")
 
-# ---------------------------------
-# FOOTER
-# ---------------------------------
 show_footer()
