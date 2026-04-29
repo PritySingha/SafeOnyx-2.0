@@ -1,13 +1,13 @@
-import pickle
+import joblib
 import re
 import pandas as pd
 import tldextract
 
-with open("models/url_model.pkl", "rb") as f:
-    model = pickle.load(f)
+with open("models/url_model.joblib", "rb") as f:
+    model = joblib.load(f)
 
-with open("models/url_columns.pkl", "rb") as f:
-    columns = pickle.load(f)
+with open("models/url_columns.joblib", "rb") as f:
+    columns = joblib.load(f)
 
 # Suspicious TLDs
 SUSPICIOUS_TLDS = {".ru", ".tk", ".ml", ".xyz", ".top", ".gq", ".cf", ".pw", ".cc"}

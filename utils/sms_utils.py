@@ -1,4 +1,4 @@
-import pickle
+import joblib
 import re
 import os
 import nltk     # NLTK stopwords
@@ -16,11 +16,11 @@ except LookupError:
     stop_words = set(stopwords.words('english'))
 
 # Load model
-with open("models/sms_model.pkl", "rb") as f:
-    model = pickle.load(f)
+with open("models/sms_model.joblib", "rb") as f:
+    model = joblib.load(f)
 
-with open("models/sms_vectorizer.pkl", "rb") as f:
-    vectorizer = pickle.load(f)
+with open("models/sms_vectorizer.joblib", "rb") as f:
+    vectorizer = joblib.load(f)
 
 
 def clean_text(text):

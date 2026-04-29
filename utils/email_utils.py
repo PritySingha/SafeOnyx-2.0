@@ -1,4 +1,4 @@
-import pickle
+import joblib
 import re
 import os
 
@@ -16,11 +16,11 @@ except LookupError:
     stop_words = set(stopwords.words('english'))
 
 
-with open("models/email_model.pkl", "rb") as f:
-    model = pickle.load(f)
+with open("models/email_model.joblib", "rb") as f:
+    model = joblib.load(f)
 
-with open("models/email_vectorizer.pkl", "rb") as f:
-    vectorizer = pickle.load(f)
+with open("models/email_vectorizer.joblib", "rb") as f:
+    vectorizer = joblib.load(f)
 
 
 def clean_text(text):
