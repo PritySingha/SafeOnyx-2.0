@@ -2,29 +2,6 @@ import streamlit as st
 from navbar import show_navbar
 from footer import show_footer
 
-import streamlit as st
-
-import streamlit as st
-import streamlit.components.v1 as components
-
-components.html(
-    """
-    <script>
-    function hideBadge() {
-        const elements = window.parent.document.querySelectorAll('*');
-        elements.forEach(el => {
-            if (el.innerText &&
-                el.innerText.includes('Hosted with Streamlit')) {
-                el.style.display = 'none';
-            }
-        });
-    }
-
-    setInterval(hideBadge, 1000);
-    </script>
-    """,
-    height=0,
-)
 
 st.set_page_config(
     page_title="SafeOnyx",
