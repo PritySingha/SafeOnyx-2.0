@@ -4,33 +4,41 @@ from footer import show_footer
 
 import streamlit as st
 
+st.set_page_config(layout="wide")
+
 hide_streamlit_style = """
 <style>
-[data-testid="stToolbar"] {
-    display: none;
-}
 
-[data-testid="stDecoration"] {
-    display: none;
-}
-
-[data-testid="stStatusWidget"] {
-    visibility: hidden;
-    height: 0%;
-    position: fixed;
-}
-
+/* Hide hamburger menu */
 #MainMenu {
     visibility: hidden;
 }
 
+/* Hide footer */
+footer {
+    visibility: hidden;
+}
+
+/* Hide header */
 header {
     visibility: hidden;
 }
 
-footer {
-    visibility: hidden;
+/* Hide Streamlit deploy button / badge */
+[data-testid="stStatusWidget"] {
+    display: none !important;
 }
+
+/* Hide bottom-right floating decoration */
+[data-testid="stDecoration"] {
+    display: none !important;
+}
+
+/* Hide toolbar */
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+
 </style>
 """
 
