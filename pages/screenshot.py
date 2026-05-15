@@ -58,8 +58,6 @@ if uploaded_file is not None:
                 unsafe_allow_html=True
             )
 
-        st.markdown("### 📝 Extracted Text")
-        st.text_area("", extracted_text, height=150)
 
         if reasons:
             st.markdown("### 🔍 Why this result?")

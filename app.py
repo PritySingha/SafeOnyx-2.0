@@ -2,6 +2,40 @@ import streamlit as st
 from navbar import show_navbar
 from footer import show_footer
 
+import streamlit as st
+
+hide_streamlit_style = """
+<style>
+[data-testid="stToolbar"] {
+    display: none;
+}
+
+[data-testid="stDecoration"] {
+    display: none;
+}
+
+[data-testid="stStatusWidget"] {
+    visibility: hidden;
+    height: 0%;
+    position: fixed;
+}
+
+#MainMenu {
+    visibility: hidden;
+}
+
+header {
+    visibility: hidden;
+}
+
+footer {
+    visibility: hidden;
+}
+</style>
+"""
+
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 st.set_page_config(
     page_title="SafeOnyx",
     page_icon="assets/logo.png",
