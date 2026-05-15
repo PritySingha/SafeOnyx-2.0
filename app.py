@@ -4,45 +4,27 @@ from footer import show_footer
 
 import streamlit as st
 
-st.set_page_config(layout="wide")
+import streamlit as st
+import streamlit.components.v1 as components
 
-hide_streamlit_style = """
-<style>
+components.html(
+    """
+    <script>
+    function hideBadge() {
+        const elements = window.parent.document.querySelectorAll('*');
+        elements.forEach(el => {
+            if (el.innerText &&
+                el.innerText.includes('Hosted with Streamlit')) {
+                el.style.display = 'none';
+            }
+        });
+    }
 
-/* Hide hamburger menu */
-#MainMenu {
-    visibility: hidden;
-}
-
-/* Hide footer */
-footer {
-    visibility: hidden;
-}
-
-/* Hide header */
-header {
-    visibility: hidden;
-}
-
-/* Hide Streamlit deploy button / badge */
-[data-testid="stStatusWidget"] {
-    display: none !important;
-}
-
-/* Hide bottom-right floating decoration */
-[data-testid="stDecoration"] {
-    display: none !important;
-}
-
-/* Hide toolbar */
-[data-testid="stToolbar"] {
-    display: none !important;
-}
-
-</style>
-"""
-
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+    setInterval(hideBadge, 1000);
+    </script>
+    """,
+    height=0,
+)
 
 st.set_page_config(
     page_title="SafeOnyx",
