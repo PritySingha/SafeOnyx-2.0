@@ -1,8 +1,9 @@
-import joblib
+import pickle
 import re
 import os
-
+import joblib
 import nltk
+
 nltk_data_dir = os.path.join(os.path.dirname(__file__), "..", "nltk_data")
 os.makedirs(nltk_data_dir, exist_ok=True)
 nltk.data.path.append(os.path.abspath(nltk_data_dir))
@@ -16,10 +17,10 @@ except LookupError:
     stop_words = set(stopwords.words('english'))
 
 
-with open("models/email_model.joblib", "rb") as f:
+with open("models/email_logistic_regression_model.pkl", "rb") as f:
     model = joblib.load(f)
 
-with open("models/email_vectorizer.joblib", "rb") as f:
+with open("models/email_tfidf_vectorizer.pkl", "rb") as f:
     vectorizer = joblib.load(f)
 
 

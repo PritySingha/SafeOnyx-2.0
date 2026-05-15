@@ -1,6 +1,7 @@
-import joblib
+import pickle
 import re
 import os
+import joblib
 import nltk     # NLTK stopwords
 
 nltk_data_dir = os.path.join(os.path.dirname(__file__), "..", "nltk_data")
@@ -16,10 +17,10 @@ except LookupError:
     stop_words = set(stopwords.words('english'))
 
 # Load model
-with open("models/sms_model.joblib", "rb") as f:
+with open("models/sms_random_forest_model.pkl", "rb") as f:
     model = joblib.load(f)
 
-with open("models/sms_vectorizer.joblib", "rb") as f:
+with open("models/sms_tfidf_vectorizer.pkl", "rb") as f:
     vectorizer = joblib.load(f)
 
 
